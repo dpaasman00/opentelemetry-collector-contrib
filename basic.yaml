@@ -1,0 +1,11 @@
+receivers:
+  flume:
+    endpoint: http://localhost:41414/metrics
+
+exporters:
+  logging:
+service:
+  pipelines:
+    metrics:
+      receivers: [flume]
+      exporters: [logging]
