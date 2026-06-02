@@ -966,6 +966,8 @@ agent:
   bootstrap_timeout: 8s
   opamp_server_port: 8090
   passthrough_logs: true
+  package:
+    agent_binary: custom-otelcol
 
 telemetry:
   logs:
@@ -1013,7 +1015,10 @@ telemetry:
 						OpAMPServerPort:         8090,
 						PassthroughLogs:         true,
 						ValidateConfig:          DefaultSupervisor().Agent.ValidateConfig,
-						Package:                 DefaultSupervisor().Agent.Package,
+						Package: AgentPackage{
+							AgentBinary: "custom-otelcol",
+							Verifier:    DefaultSupervisor().Agent.Package.Verifier,
+						},
 					},
 					Telemetry: Telemetry{
 						Logs: Logs{

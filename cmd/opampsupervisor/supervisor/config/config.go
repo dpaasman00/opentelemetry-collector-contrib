@@ -442,6 +442,11 @@ func DefaultSupervisor() Supervisor {
 		defaultStorageDir = filepath.Join(programDataDir, "Otelcol", "Supervisor")
 	}
 
+	defaultAgentBinary := "otelcol-contrib"
+	if runtime.GOOS == "windows" {
+		defaultAgentBinary += ".exe"
+	}
+
 	return Supervisor{
 		Capabilities: Capabilities{
 			AcceptsRemoteConfig:            false,
@@ -468,7 +473,8 @@ func DefaultSupervisor() Supervisor {
 			PassthroughLogs:         false,
 			ValidateConfig:          false,
 			Package: AgentPackage{
-				Verifier: Verifier{Type: VerifierTypeNone},
+				AgentBinary: defaultAgentBinary,
+				Verifier:    Verifier{Type: VerifierTypeNone},
 			},
 		},
 		Telemetry: Telemetry{
