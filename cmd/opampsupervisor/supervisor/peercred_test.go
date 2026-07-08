@@ -19,6 +19,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/component"
 	"go.uber.org/zap"
+
+	"github.com/open-telemetry/opentelemetry-collector-contrib/cmd/opampsupervisor/supervisor/config"
 )
 
 // unixConnPair returns the server side of a connected Unix domain socket pair.
@@ -136,6 +138,27 @@ func newPeerAuthSupervisor() *Supervisor {
 			TelemetrySettings: component.TelemetrySettings{Logger: zap.NewNop()},
 		},
 	}
+}
+
+func TestCreateOpAMPServerListenerSocketMode(t *testing.T) {
+	dir, err := os.MkdirTemp("/tmp", "sockmode")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	socketPath := filepath.Join(dir, "opamp.sock")
+
+	s := newPeerAuthSupervisor()
+	s.config = config.Supervisor{Agent: config.Agent{
+		OpAMPServerUnixSocket:     socketPath,
+		OpAMPServerUnixSocketMode: "0660",
+	}}
+
+	ln, err := s.createOpAMPServerListener()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = ln.Close() })
+
+	info, err := os.Stat(socketPath)
+	require.NoError(t, err)
+	require.Equal(t, os.FileMode(0o660), info.Mode().Perm(), "socket file must carry the configured mode")
 }
 
 func TestAuthenticateAgentPeer_AcceptsSpawnedCollector(t *testing.T) {

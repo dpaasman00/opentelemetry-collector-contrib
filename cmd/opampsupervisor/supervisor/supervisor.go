@@ -2579,9 +2579,9 @@ func (s *Supervisor) usingUnixSocket() bool {
 }
 
 // createOpAMPServerListener opens the Unix domain socket listener for the local
-// OpAMP server. It removes any stale socket left by a previous run and restricts
-// the socket to the owning user. The returned listener unlinks the socket file
-// when closed.
+// OpAMP server. It removes any stale socket left by a previous run and sets the
+// socket file to the configured permission mode (default 0600, owner-only). The
+// returned listener unlinks the socket file when closed.
 func (s *Supervisor) createOpAMPServerListener() (net.Listener, error) {
 	socketPath := s.config.Agent.OpAMPServerUnixSocket
 
@@ -2604,10 +2604,10 @@ func (s *Supervisor) createOpAMPServerListener() (net.Listener, error) {
 		return nil, fmt.Errorf("listen on opamp unix socket %q: %w", socketPath, err)
 	}
 
-	// Restrict the socket to the owning user so only processes running as the
-	// same user can connect, as defense in depth alongside the peer-credential
-	// check performed on each connection.
-	if err := os.Chmod(socketPath, 0o600); err != nil {
+	// Set the socket to the configured mode (default 0600, owner-only) so the
+	// filesystem limits who can connect, as defense in depth alongside the
+	// peer-credential check performed on each connection.
+	if err := os.Chmod(socketPath, s.config.Agent.UnixSocketFileMode()); err != nil {
 		_ = ln.Close()
 		return nil, fmt.Errorf("chmod opamp unix socket %q: %w", socketPath, err)
 	}

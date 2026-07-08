@@ -245,16 +245,40 @@ type Agent struct {
 	// supervisor authenticate the collector peer via its kernel-vouched
 	// credentials. It is mutually exclusive with opamp_server_port and is only
 	// supported on Linux and macOS.
-	OpAMPServerUnixSocket string            `mapstructure:"opamp_server_unix_socket"`
-	PassthroughLogs       bool              `mapstructure:"passthrough_logs"`
-	UseHUPConfigReload    bool              `mapstructure:"use_hup_config_reload"`
-	ValidateConfig        bool              `mapstructure:"validate_config"`
-	ConfigFiles           []string          `mapstructure:"config_files"`
-	Arguments             []string          `mapstructure:"args"`
-	Env                   map[string]string `mapstructure:"env"`
+	OpAMPServerUnixSocket string `mapstructure:"opamp_server_unix_socket"`
+	// OpAMPServerUnixSocketMode is the octal permission mode, as a string, that
+	// the Unix domain socket file is created with, e.g. "0660". Defaults to
+	// "0600" (owner-only). Note that modes granting group or other access are
+	// only reachable if the socket's parent directory also permits traversal;
+	// the supervisor creates a missing parent directory with mode 0700 but never
+	// changes the permissions of an existing one. Peer authentication still
+	// rejects peers whose UID differs from the supervisor's, regardless of this
+	// mode.
+	OpAMPServerUnixSocketMode string            `mapstructure:"opamp_server_unix_socket_mode"`
+	PassthroughLogs           bool              `mapstructure:"passthrough_logs"`
+	UseHUPConfigReload        bool              `mapstructure:"use_hup_config_reload"`
+	ValidateConfig            bool              `mapstructure:"validate_config"`
+	ConfigFiles               []string          `mapstructure:"config_files"`
+	Arguments                 []string          `mapstructure:"args"`
+	Env                       map[string]string `mapstructure:"env"`
 	// StartupFallbackConfigs is an ordered list of fallback configuration files to use
 	// when the OpAMP server is unreachable. Configs are merged in order.
 	StartupFallbackConfigs []string `mapstructure:"startup_fallback_configs"`
+}
+
+// UnixSocketFileMode returns the permission mode the OpAMP Unix domain socket
+// file is created with: OpAMPServerUnixSocketMode if set (already validated as
+// octal by Validate), otherwise 0600.
+func (a Agent) UnixSocketFileMode() os.FileMode {
+	if a.OpAMPServerUnixSocketMode == "" {
+		return 0o600
+	}
+	mode, err := strconv.ParseUint(a.OpAMPServerUnixSocketMode, 8, 32)
+	if err != nil {
+		// Unreachable after Validate; fail closed to owner-only.
+		return 0o600
+	}
+	return os.FileMode(mode)
 }
 
 func (a Agent) Validate() error {
@@ -289,6 +313,15 @@ func (a Agent) Validate() error {
 		}
 		if len(a.OpAMPServerUnixSocket) > maxLen {
 			return fmt.Errorf("agent::opamp_server_unix_socket path exceeds the platform limit of %d bytes", maxLen)
+		}
+	}
+
+	if a.OpAMPServerUnixSocketMode != "" {
+		if a.OpAMPServerUnixSocket == "" {
+			return errors.New("agent::opamp_server_unix_socket_mode requires agent::opamp_server_unix_socket")
+		}
+		if mode, err := strconv.ParseUint(a.OpAMPServerUnixSocketMode, 8, 32); err != nil || mode > 0o777 {
+			return errors.New(`agent::opamp_server_unix_socket_mode must be an octal permission mode between "0" and "0777"`)
 		}
 	}
 

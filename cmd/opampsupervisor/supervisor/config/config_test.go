@@ -468,6 +468,87 @@ func TestValidate(t *testing.T) {
 			},
 		},
 		{
+			name: "Unix socket mode configured",
+			config: Supervisor{
+				Server: OpAMPServer{
+					Endpoint: "wss://localhost:9090/opamp",
+				},
+				Agent: Agent{
+					Executable:                "${file_path}",
+					OrphanDetectionInterval:   5 * time.Second,
+					ConfigApplyTimeout:        2 * time.Second,
+					OpAMPServerUnixSocket:     "/tmp/opamp.sock",
+					OpAMPServerUnixSocketMode: "0660",
+					BootstrapTimeout:          5 * time.Second,
+				},
+				Capabilities: Capabilities{
+					AcceptsRemoteConfig: true,
+				},
+				Storage: Storage{
+					Directory: "/etc/opamp-supervisor/storage",
+				},
+				HealthCheck: defaultHealthCheck,
+			},
+			expectedErrorFunc: func() string {
+				if runtime.GOOS == "windows" {
+					return "agent::opamp_server_unix_socket is not supported on windows"
+				}
+				return ""
+			},
+		},
+		{
+			name: "Unix socket mode invalid",
+			config: Supervisor{
+				Server: OpAMPServer{
+					Endpoint: "wss://localhost:9090/opamp",
+				},
+				Agent: Agent{
+					Executable:                "${file_path}",
+					OrphanDetectionInterval:   5 * time.Second,
+					ConfigApplyTimeout:        2 * time.Second,
+					OpAMPServerUnixSocket:     "/tmp/opamp.sock",
+					OpAMPServerUnixSocketMode: "rw-rw----",
+					BootstrapTimeout:          5 * time.Second,
+				},
+				Capabilities: Capabilities{
+					AcceptsRemoteConfig: true,
+				},
+				Storage: Storage{
+					Directory: "/etc/opamp-supervisor/storage",
+				},
+				HealthCheck: defaultHealthCheck,
+			},
+			expectedErrorFunc: func() string {
+				if runtime.GOOS == "windows" {
+					return "agent::opamp_server_unix_socket is not supported on windows"
+				}
+				return `agent::opamp_server_unix_socket_mode must be an octal permission mode between "0" and "0777"`
+			},
+		},
+		{
+			name: "Unix socket mode without socket",
+			config: Supervisor{
+				Server: OpAMPServer{
+					Endpoint: "wss://localhost:9090/opamp",
+				},
+				Agent: Agent{
+					Executable:                "${file_path}",
+					OrphanDetectionInterval:   5 * time.Second,
+					ConfigApplyTimeout:        2 * time.Second,
+					OpAMPServerUnixSocketMode: "0660",
+					BootstrapTimeout:          5 * time.Second,
+				},
+				Capabilities: Capabilities{
+					AcceptsRemoteConfig: true,
+				},
+				Storage: Storage{
+					Directory: "/etc/opamp-supervisor/storage",
+				},
+				HealthCheck: defaultHealthCheck,
+			},
+			expectedErrorFunc: simpleError("agent::opamp_server_unix_socket_mode requires agent::opamp_server_unix_socket"),
+		},
+		{
 			name: "Zero value opamp server port number",
 			config: Supervisor{
 				Server: OpAMPServer{

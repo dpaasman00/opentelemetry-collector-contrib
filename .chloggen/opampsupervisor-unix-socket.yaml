@@ -20,7 +20,8 @@ subtext: |
   When set, the Supervisor serves its local OpAMP server on the configured filesystem socket
   instead of a loopback TCP port and authenticates the connecting Collector via SO_PEERCRED
   (UID and PID on Linux, UID on macOS). It is mutually exclusive with `opamp_server_port` and is
-  rejected on Windows.
+  rejected on Windows. The socket file's permission mode can be set with
+  `agent.opamp_server_unix_socket_mode` (octal string, default `"0600"`).
 
 # If your change doesn't affect end users or the exported elements of any package,
 # you should instead start your pull request title with [chore] or use the "Skip Changelog" label.
