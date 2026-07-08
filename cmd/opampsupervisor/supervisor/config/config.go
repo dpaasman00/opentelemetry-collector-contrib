@@ -231,19 +231,27 @@ func (o OpAMPServer) Validate() error {
 }
 
 type Agent struct {
-	Executable              string            `mapstructure:"executable"`
-	InstanceID              string            `mapstructure:"instance_id"`
-	OrphanDetectionInterval time.Duration     `mapstructure:"orphan_detection_interval"`
-	Description             AgentDescription  `mapstructure:"description"`
-	ConfigApplyTimeout      time.Duration     `mapstructure:"config_apply_timeout"`
-	BootstrapTimeout        time.Duration     `mapstructure:"bootstrap_timeout"`
-	OpAMPServerPort         int               `mapstructure:"opamp_server_port"`
-	PassthroughLogs         bool              `mapstructure:"passthrough_logs"`
-	UseHUPConfigReload      bool              `mapstructure:"use_hup_config_reload"`
-	ValidateConfig          bool              `mapstructure:"validate_config"`
-	ConfigFiles             []string          `mapstructure:"config_files"`
-	Arguments               []string          `mapstructure:"args"`
-	Env                     map[string]string `mapstructure:"env"`
+	Executable              string           `mapstructure:"executable"`
+	InstanceID              string           `mapstructure:"instance_id"`
+	OrphanDetectionInterval time.Duration    `mapstructure:"orphan_detection_interval"`
+	Description             AgentDescription `mapstructure:"description"`
+	ConfigApplyTimeout      time.Duration    `mapstructure:"config_apply_timeout"`
+	BootstrapTimeout        time.Duration    `mapstructure:"bootstrap_timeout"`
+	OpAMPServerPort         int              `mapstructure:"opamp_server_port"`
+	// OpAMPServerUnixSocket, when set, makes the supervisor serve its local OpAMP
+	// server (the one the managed collector connects to) on a filesystem-path
+	// Unix domain socket at this path instead of a loopback TCP port. This avoids
+	// opening a TCP port for supervisor<->collector traffic and lets the
+	// supervisor authenticate the collector peer via its kernel-vouched
+	// credentials. It is mutually exclusive with opamp_server_port and is only
+	// supported on Linux and macOS.
+	OpAMPServerUnixSocket string            `mapstructure:"opamp_server_unix_socket"`
+	PassthroughLogs       bool              `mapstructure:"passthrough_logs"`
+	UseHUPConfigReload    bool              `mapstructure:"use_hup_config_reload"`
+	ValidateConfig        bool              `mapstructure:"validate_config"`
+	ConfigFiles           []string          `mapstructure:"config_files"`
+	Arguments             []string          `mapstructure:"args"`
+	Env                   map[string]string `mapstructure:"env"`
 	// StartupFallbackConfigs is an ordered list of fallback configuration files to use
 	// when the OpAMP server is unreachable. Configs are merged in order.
 	StartupFallbackConfigs []string `mapstructure:"startup_fallback_configs"`
@@ -260,6 +268,28 @@ func (a Agent) Validate() error {
 
 	if a.OpAMPServerPort < 0 || a.OpAMPServerPort > 65535 {
 		return errors.New("agent::opamp_server_port must be a valid port number")
+	}
+
+	if a.OpAMPServerUnixSocket != "" {
+		if runtime.GOOS == "windows" {
+			return errors.New("agent::opamp_server_unix_socket is not supported on windows")
+		}
+		if a.OpAMPServerPort != 0 {
+			return errors.New("agent::opamp_server_unix_socket and agent::opamp_server_port are mutually exclusive")
+		}
+		if !filepath.IsAbs(a.OpAMPServerUnixSocket) {
+			return errors.New("agent::opamp_server_unix_socket must be an absolute path")
+		}
+		// The kernel's sun_path limit: 104 bytes on Darwin, 108 on Linux, both
+		// including the trailing NUL. Reject here for a clear error instead of
+		// net.Listen's opaque "bind: invalid argument".
+		maxLen := 107
+		if runtime.GOOS == "darwin" {
+			maxLen = 103
+		}
+		if len(a.OpAMPServerUnixSocket) > maxLen {
+			return fmt.Errorf("agent::opamp_server_unix_socket path exceeds the platform limit of %d bytes", maxLen)
+		}
 	}
 
 	if a.InstanceID != "" {

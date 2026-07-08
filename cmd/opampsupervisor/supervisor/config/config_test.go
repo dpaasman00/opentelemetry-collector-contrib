@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -351,6 +352,120 @@ func TestValidate(t *testing.T) {
 				},
 			},
 			expectedErrorFunc: simpleError("agent::opamp_server_port must be a valid port number"),
+		},
+		{
+			name: "Unix socket and TCP port both set",
+			config: Supervisor{
+				Server: OpAMPServer{
+					Endpoint: "wss://localhost:9090/opamp",
+				},
+				Agent: Agent{
+					Executable:              "${file_path}",
+					OrphanDetectionInterval: 5 * time.Second,
+					ConfigApplyTimeout:      2 * time.Second,
+					OpAMPServerPort:         8090,
+					OpAMPServerUnixSocket:   "/tmp/opamp.sock",
+					BootstrapTimeout:        5 * time.Second,
+				},
+				Capabilities: Capabilities{
+					AcceptsRemoteConfig: true,
+				},
+				Storage: Storage{
+					Directory: "/etc/opamp-supervisor/storage",
+				},
+				HealthCheck: defaultHealthCheck,
+			},
+			expectedErrorFunc: simpleError("agent::opamp_server_unix_socket and agent::opamp_server_port are mutually exclusive"),
+		},
+		{
+			name: "Unix socket configured",
+			config: Supervisor{
+				Server: OpAMPServer{
+					Endpoint: "wss://localhost:9090/opamp",
+				},
+				Agent: Agent{
+					Executable:              "${file_path}",
+					OrphanDetectionInterval: 5 * time.Second,
+					ConfigApplyTimeout:      2 * time.Second,
+					OpAMPServerUnixSocket:   "/tmp/opamp.sock",
+					BootstrapTimeout:        5 * time.Second,
+				},
+				Capabilities: Capabilities{
+					AcceptsRemoteConfig: true,
+				},
+				Storage: Storage{
+					Directory: "/etc/opamp-supervisor/storage",
+				},
+				HealthCheck: defaultHealthCheck,
+			},
+			// Valid on Linux and macOS; rejected on Windows.
+			expectedErrorFunc: func() string {
+				if runtime.GOOS == "windows" {
+					return "agent::opamp_server_unix_socket is not supported on windows"
+				}
+				return ""
+			},
+		},
+		{
+			name: "Unix socket relative path",
+			config: Supervisor{
+				Server: OpAMPServer{
+					Endpoint: "wss://localhost:9090/opamp",
+				},
+				Agent: Agent{
+					Executable:              "${file_path}",
+					OrphanDetectionInterval: 5 * time.Second,
+					ConfigApplyTimeout:      2 * time.Second,
+					OpAMPServerUnixSocket:   "relative/opamp.sock",
+					BootstrapTimeout:        5 * time.Second,
+				},
+				Capabilities: Capabilities{
+					AcceptsRemoteConfig: true,
+				},
+				Storage: Storage{
+					Directory: "/etc/opamp-supervisor/storage",
+				},
+				HealthCheck: defaultHealthCheck,
+			},
+			// On Windows the platform check fires first.
+			expectedErrorFunc: func() string {
+				if runtime.GOOS == "windows" {
+					return "agent::opamp_server_unix_socket is not supported on windows"
+				}
+				return "agent::opamp_server_unix_socket must be an absolute path"
+			},
+		},
+		{
+			name: "Unix socket path too long",
+			config: Supervisor{
+				Server: OpAMPServer{
+					Endpoint: "wss://localhost:9090/opamp",
+				},
+				Agent: Agent{
+					Executable:              "${file_path}",
+					OrphanDetectionInterval: 5 * time.Second,
+					ConfigApplyTimeout:      2 * time.Second,
+					OpAMPServerUnixSocket:   "/tmp/" + strings.Repeat("a", 150) + ".sock",
+					BootstrapTimeout:        5 * time.Second,
+				},
+				Capabilities: Capabilities{
+					AcceptsRemoteConfig: true,
+				},
+				Storage: Storage{
+					Directory: "/etc/opamp-supervisor/storage",
+				},
+				HealthCheck: defaultHealthCheck,
+			},
+			expectedErrorFunc: func() string {
+				switch runtime.GOOS {
+				case "windows":
+					return "agent::opamp_server_unix_socket is not supported on windows"
+				case "darwin":
+					return "agent::opamp_server_unix_socket path exceeds the platform limit of 103 bytes"
+				default:
+					return "agent::opamp_server_unix_socket path exceeds the platform limit of 107 bytes"
+				}
+			},
 		},
 		{
 			name: "Zero value opamp server port number",
