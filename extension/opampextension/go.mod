@@ -137,4 +137,4 @@ replace github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status => 
 // TODO(opamp-uds): temporary replace pointing at the local opamp-go fork that adds
 // StartSettings.DialContext (Unix domain socket dialing). Remove and bump to the
 // tagged opamp-go release before this PR is merged.
-replace github.com/open-telemetry/opamp-go => ../../../../../opamp-go/dpaasman00/main
+replace github.com/open-telemetry/opamp-go => github.com/dpaasman00/opamp-go v0.0.0-20260708172145-13df0330339d
